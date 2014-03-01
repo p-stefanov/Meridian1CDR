@@ -30,6 +30,8 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('callid');
-__PACKAGE__->belongs_to('user' => 'Meridian::Schema::Result::User');
+__PACKAGE__->belongs_to('user' => 'Meridian::Schema::Result::User',
+	{ id => "user" },
+);
 
 1;

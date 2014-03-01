@@ -22,6 +22,17 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('dn');
-__PACKAGE__->has_many('calls' => 'Meridian::Schema::Result::Call');
+__PACKAGE__->has_many('calls' => 'Meridian::Schema::Result::Call',
+	{ "foreign.user" => "self.dn" },
+);
+
+sub new {
+	my ( $class, $attrs ) = @_;
+
+	$attrs->{ 'callscount' } = 0 unless defined $attrs->{ 'callscount' };
+	$attrs->{ 'seconds' } = 0 unless defined $attrs->{ 'seconds' };
+
+	return $class->next::method( $attrs );
+}
 
 1;

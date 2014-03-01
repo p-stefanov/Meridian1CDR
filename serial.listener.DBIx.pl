@@ -41,7 +41,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					(?<duration>\d\d:\d\d:\d\d)\s+A*\s*
 					(?<number>\d+)
 				/x) {
-				say "Call from $+{dn} through trunk $+{trunk} on $+{date} at $+{time}, lasted $+{duration}, to $+{number}";
+				say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec.";
 				my @duration = split(':', $+{duration});
 				my $seconds = $duration[0] * 3600 + $duration[1] * 60 + $duration[2];
 				my $time = ((localtime)[5] + 1900) . '-' . join '-', split '/', $+{date} . ' ' . $+{time};
@@ -55,11 +55,8 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					date => $time,
 					called => $+{number},
 				});
-				{
-					no warnings 'uninitialized';
-					$user->callscount($user->callscount + 1);
-					$user->seconds($user->seconds + $seconds);
-				}
+				$user->callscount($user->callscount + 1);
+				$user->seconds($user->seconds + $seconds);
 				$user->insert_or_update;
 			}
 		});
