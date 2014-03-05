@@ -9,9 +9,8 @@ use Meridian::Schema;
 use 5.010;
 
 use Path::Class 'file';
-my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file('db/calls.db');
 
-my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
+my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
 
 my $cv = AnyEvent->condvar;
 my $hdl; $hdl = AnyEvent::SerialPort->new(
@@ -41,6 +40,10 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					(?<duration>\d\d:\d\d:\d\d)\s+A*\s*
 					(?<number>\d+)
 				/x) {
+				my $dbName = $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
+				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$dbName.db");
+				my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
+
 				say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec.";
 				my @duration = split(':', $+{duration});
 				my $seconds = $duration[0] * 3600 + $duration[1] * 60 + $duration[2];
