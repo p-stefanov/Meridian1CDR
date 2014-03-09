@@ -12,7 +12,48 @@ use Path::Class 'file';
 
 my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
 
+my $initSQL = q/create table if not exists user
+(
+dn integer not null PRIMARY KEY,
+callscount integer not null,
+seconds integer not null
+);
+
+create table if not exists call
+(
+callid integer not null PRIMARY KEY,
+dn integer not null,
+seconds integer not null,
+trunk text not null,
+date text not null,
+called text not null,
+FOREIGN KEY(dn) REFERENCES user(dn)
+);
+/;
+
+# on startup check if db for this month exists and if not - create it
+my $dbName = $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
+unless (-e "db/$dbName.db") {
+	system("sqlite3 db/$dbName.db '$initSQL'") == 0 or print STDERR $!;
+	say "file created for THIS month";
+}
+
 my $cv = AnyEvent->condvar;
+
+# timer to check every 27 days if db for next month exist and if not - create it
+my $w = AnyEvent->timer(
+	after => 0,
+	interval => 27 * 24 * 60 * 60,
+	cb => sub {
+		# + 1 stands for next month ..........\/
+		my $dbName = $months[((localtime)[4] + 1) % 12] . '-' . ((localtime)[5] + 1900);
+		unless (-e "db/$dbName.db") {
+			system("sqlite3 db/$dbName.db '$initSQL'") == 0 or print STDERR $!;
+			say "file created for NEXT month";
+		}
+	}
+);
+
 my $hdl; $hdl = AnyEvent::SerialPort->new(
 	serial_port =>
 		[ '/dev/ttyUSB0',
@@ -52,7 +93,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					dn => $+{dn},
 				});
 				$schema->resultset('Call')->create({
-					user => $+{dn},
+					dn => $+{dn},
 					trunk => $+{trunk},
 					seconds => $seconds,
 					date => $time,

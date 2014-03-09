@@ -12,7 +12,7 @@ __PACKAGE__->add_columns(
 		data_type => 'integer',
 		is_auto_increment => 1
 	},
-	user => {
+	dn => {
 		data_type => 'integer',
 	},
 	seconds => {
@@ -30,8 +30,6 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('callid');
-__PACKAGE__->belongs_to('user' => 'Meridian::Schema::Result::User',
-	{ id => "user" },
-);
+__PACKAGE__->belongs_to('user' => 'Meridian::Schema::Result::User', 'dn');
 
 1;

@@ -13,24 +13,20 @@ __PACKAGE__->add_columns(
 	},
 	callscount => {
 		data_type => 'integer',
-		# default_value => 0, #nope
 	},
 	seconds => {
 		data_type => 'integer',
-		# default_value => 0, #nope
 	},
 );
 
 __PACKAGE__->set_primary_key('dn');
-__PACKAGE__->has_many('calls' => 'Meridian::Schema::Result::Call',
-	{ "foreign.user" => "self.dn" },
-);
+__PACKAGE__->has_many('calls' => 'Meridian::Schema::Result::Call', 'dn');
 
 sub new {
 	my ( $class, $attrs ) = @_;
 
-	$attrs->{ 'callscount' } = 0 unless defined $attrs->{ 'callscount' };
-	$attrs->{ 'seconds' } = 0 unless defined $attrs->{ 'seconds' };
+	$attrs->{ 'callscount' } ||= 0;
+	$attrs->{ 'seconds' } ||= 0;
 
 	return $class->next::method( $attrs );
 }
