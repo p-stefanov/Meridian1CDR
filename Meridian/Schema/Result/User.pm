@@ -17,6 +17,9 @@ __PACKAGE__->add_columns(
 	seconds => {
 		data_type => 'integer',
 	},
+	bill => {
+		data_type => 'real',
+	},
 );
 
 __PACKAGE__->set_primary_key('dn');
@@ -27,6 +30,7 @@ sub new {
 
 	$attrs->{ 'callscount' } ||= 0;
 	$attrs->{ 'seconds' } ||= 0;
+	$attrs->{ 'bill' } ||= 0;
 
 	return $class->next::method( $attrs );
 }

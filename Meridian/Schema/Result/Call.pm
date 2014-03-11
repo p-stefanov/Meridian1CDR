@@ -27,6 +27,9 @@ __PACKAGE__->add_columns(
 	called => {
 		data_type => 'text',
 	},
+	price => {
+		data_type => 'real',
+	},
 );
 
 __PACKAGE__->set_primary_key('callid');
