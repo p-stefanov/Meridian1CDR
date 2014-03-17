@@ -15,6 +15,15 @@ my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
 
 sub calc_price;
 sub is_day;
+sub this_month {
+	return $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
+}
+sub next_month {
+	if ((localtime)[4] == 11) { # is Dec => next is Jan of next year!
+		return $months[0] . '-' . ((localtime)[5] + 1901);
+	}
+	return $months[(localtime)[4] + 1] . '-' . ((localtime)[5] + 1900);
+}
 
 # get info from json file
 local $/;
@@ -25,7 +34,7 @@ $json = $json->relaxed([1]);
 my $json_ref = $json->decode( <$fh> );
 
 # on startup check if db for this month exists and if not - create it
-my $dbName = $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
+my $dbName = this_month();
 unless (-e "db/$dbName.db") {
 	system("sqlite3 db/$dbName.db < db/init.sql") == 0 or die $!;
 	say "file created for THIS month";
@@ -39,7 +48,7 @@ my $w = AnyEvent->timer(
 	interval => 27 * 24 * 60 * 60,
 	cb => sub {
 		# + 1 stands for next month ..........\/
-		my $dbName = $months[((localtime)[4] + 1) % 12] . '-' . ((localtime)[5] + 1900);
+		my $dbName = next_month();
 		unless (-e "db/$dbName.db") {
 			system("sqlite3 db/$dbName.db < db/init.sql") == 0 or die $!;
 			say "file created for NEXT month";
@@ -96,6 +105,10 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 				my $user = $schema->resultset('User')->find_or_new({
 					dn => $+{dn},
 				});
+				$user->callscount($user->callscount + 1);
+				$user->bill($user->bill + $price);
+				$user->seconds($user->seconds + $seconds);
+				$user->insert_or_update;
 
 				$schema->resultset('Call')->create({
 					dn => $+{dn},
@@ -105,10 +118,6 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					called => $+{number},
 					price => $price,
 				});
-				$user->callscount($user->callscount + 1);
-				$user->bill($user->bill + $price);
-				$user->seconds($user->seconds + $seconds);
-				$user->insert_or_update;
 			}
 		});
 	},
