@@ -5,38 +5,71 @@ use warnings;
 
 use AnyEvent;
 use AnyEvent::SerialPort;
+use Getopt::Long;
 use JSON;
 use Meridian::Schema;
 use Math::Round 'nearest';
 use Path::Class 'file';
 use 5.010;
 
-my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+sub is_day {
+	my @time = split /:/, shift;
+	return $time[0] ge '08' && $time[0] lt '20';
+}
 
-sub calc_price;
-sub is_day;
 sub this_month {
+	my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
 	return $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
 }
+
 sub next_month {
-	if ((localtime)[4] == 11) { # is Dec => next is Jan of next year!
+	my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+	if ((localtime)[4] == 11) { # it's Dec => next month is Jan of next year!
 		return $months[0] . '-' . ((localtime)[5] + 1901);
 	}
 	return $months[(localtime)[4] + 1] . '-' . ((localtime)[5] + 1900);
 }
 
-# get info from json file
+sub calc_price; # at bottom of file
+
+
+my ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init);
+# tty -> device file name (for the serial port)
+# baudrate and databits are for the serial port connection
+# chomp -> number of digits of the access code
+# seconds -> seconds to subtract from duration of a call
+# pricing -> JSON file containing the call-pricing information
+GetOptions ("tty=s"      => \$tty,
+			"baudrate=i" => \$baudrate, 
+			"databits=i" => \$databits, 
+			"chomp=i"    => \$chomp,
+			"seconds=i"  => \$subtract,
+			"pricing=s"  => \$pricing_file,
+			"initSQL=s"  => \$sql_init)  
+	or die ("Error in command line arguments\n");
+
+for ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init) {
+	die "Define all args: -tty, -baudrate, -databits, -chomp, -seconds, -pricing, -initSQL!\n"
+	unless defined;
+}
+
+die "$pricing_file does not exist!\n" unless (-e $pricing_file);
+die "$sql_init does not exist!\n" unless (-e $sql_init);
+die "db directory does not exist!\n" unless (-d 'db');
+
+
+# get info from pricing file
 local $/;
-open( my $fh, '<', 'pricing.json' ) or die $!;
+open( my $fh, '<', $pricing_file ) or die $!;
 
 my $json = JSON->new->allow_nonref;
-$json = $json->relaxed([1]);
+$json = $json->relaxed([1]); # for trailing commas
 my $json_ref = $json->decode( <$fh> );
 
 # on startup check if db for this month exists and if not - create it
 my $dbName = this_month();
 unless (-e "db/$dbName.db") {
-	system("sqlite3 db/$dbName.db < db/init.sql") == 0 or die $!;
+	system("sqlite3 db/$dbName.db < $sql_init") == 0 or die $!;
 	say "file created for THIS month";
 }
 
@@ -47,10 +80,9 @@ my $w = AnyEvent->timer(
 	after => 0,
 	interval => 27 * 24 * 60 * 60,
 	cb => sub {
-		# + 1 stands for next month ..........\/
 		my $dbName = next_month();
 		unless (-e "db/$dbName.db") {
-			system("sqlite3 db/$dbName.db < db/init.sql") == 0 or die $!;
+			system("sqlite3 db/$dbName.db < $sql_init") == 0 or die $!;
 			say "file created for NEXT month";
 		}
 	}
@@ -58,11 +90,9 @@ my $w = AnyEvent->timer(
 
 my $hdl; $hdl = AnyEvent::SerialPort->new(
 	serial_port =>
-		# could also be ttyS0 for example
-		[ '/dev/ttyUSB0',
-			# other values here possible
-			[ baudrate => 1200 ],
-			[ databits => 7 ],
+		[ $tty,
+			[ baudrate => $baudrate ],
+			[ databits => $databits ],
 			# other [ "Device::SerialPort setter name" => \@arguments ] here
 		],
 	on_error => sub {
@@ -85,21 +115,22 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					(?<duration>\d\d:\d\d:\d\d)\s+A*\s*
 					(?<number>\d+)
 				/x) {
+
 				my @duration = split(':', $+{duration});
 				my $seconds = $duration[0] * 3600 + $duration[1] * 60 + $duration[2];
 
-				# !! designed for specific place -> substr ... , 2 (could be 3 or not fixed at all)
-				# also -> subtract some number from $seconds
-
-				my $price = calc_price( $json_ref, substr($+{number}, 2), $+{trunk}, $seconds, $+{time} );
+				# $chomp specifies the number of digits we need to remove from beginning of called number
+				# $subtract -> seconds to subtract from duration (time spent dialing)
+				my $price = calc_price( $json_ref, substr($+{number}, $chomp), $+{trunk}, $seconds - $subtract, $+{time} );
 
 				return if $price == 0;
 
-				my $dbName = $months[(localtime)[4]] . '-' . ((localtime)[5] + 1900);
+				my $dbName = this_month();
 				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$dbName.db");
 				my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
 
-				say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec, price: $price.";
+				say qq/$+{dn} calling $+{number} through $+{trunk} on $+{date}
+					at $+{time}, lasting $+{duration} sec, price: $price./;
 				my $time = ((localtime)[5] + 1900) . '-' . join '-', split '/', $+{date} . ' ' . $+{time};
 
 				my $user = $schema->resultset('User')->find_or_new({
@@ -139,19 +170,14 @@ sub calc_price {
 					return nearest( .01, $$json_ref{$i}{$j}[0] + $$json_ref{$i}{$j}[2] * ($seconds / 60) );
 				}
 			}
-			# if we are here - take default values (they must be defined in the json file)
+			# if we are here - take default values (they must be defined in the pricing file)
 			if (is_day($time)) {
 				return nearest( .01, $$json_ref{$i}{default}[0] + $$json_ref{$i}{default}[1] * ($seconds / 60) );
 			}
 			return nearest( .01, $$json_ref{$i}{default}[0] + $$json_ref{$i}{default}[2] * ($seconds / 60) );
 		}
 	}
-	# if we are here => trunk key is not found in json file (should not happen)
-	print STDERR "trunk key not found in json file\n";
+	# if we are here => trunk key is not found in pricing file (should not happen)
+	print STDERR "$trunk key not found in $pricing_file\n";
 	return 0;
-}
-
-sub is_day {
-	my @time = split /:/, shift;
-	return $time[0] ge '08' && $time[0] lt '20';
 }
