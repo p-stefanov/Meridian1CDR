@@ -39,14 +39,14 @@ my ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init);
 # chomp -> number of digits of the access code
 # seconds -> seconds to subtract from duration of a call
 # pricing -> JSON file containing the call-pricing information
-GetOptions ("tty=s"      => \$tty,
-			"baudrate=i" => \$baudrate, 
-			"databits=i" => \$databits, 
-			"chomp=i"    => \$chomp,
-			"seconds=i"  => \$subtract,
-			"pricing=s"  => \$pricing_file,
-			"initSQL=s"  => \$sql_init)  
-	or die ("Error in command line arguments\n");
+GetOptions ('tty=s'      => \$tty,
+			'baudrate=i' => \$baudrate,
+			'databits=i' => \$databits,
+			'chomp=i'    => \$chomp,
+			'seconds=i'  => \$subtract,
+			'pricing=s'  => \$pricing_file,
+			'initSQL=s'  => \$sql_init)
+	or die "Error in command line arguments\n";
 
 for ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init) {
 	die "Define all args: -tty, -baudrate, -databits, -chomp, -seconds, -pricing, -initSQL!\n"
@@ -65,6 +65,7 @@ open( my $fh, '<', $pricing_file ) or die $!;
 my $json = JSON->new->allow_nonref;
 $json = $json->relaxed([1]); # for trailing commas
 my $json_ref = $json->decode( <$fh> );
+close $fh;
 
 # on startup check if db for this month exists and if not - create it
 my $dbName = this_month();
@@ -80,9 +81,9 @@ my $w = AnyEvent->timer(
 	after => 0,
 	interval => 27 * 24 * 60 * 60,
 	cb => sub {
-		my $dbName = next_month();
-		unless (-e "db/$dbName.db") {
-			system("sqlite3 db/$dbName.db < $sql_init") == 0 or die $!;
+		my $database = next_month();
+		unless (-e "db/$database.db") {
+			system("sqlite3 db/$database.db < $sql_init") == 0 or die $!;
 			say "file created for NEXT month";
 		}
 	}
@@ -125,8 +126,8 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 
 				return if $price == 0;
 
-				my $dbName = this_month();
-				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$dbName.db");
+				my $database = this_month();
+				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$database.db");
 				my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
 
 				say qq/$+{dn} calling $+{number} through $+{trunk} on $+{date}
@@ -158,23 +159,23 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 $cv->recv;
 
 sub calc_price {
-	my ($json_ref, $called, $trunk, $seconds, $time) = @_;
+	my ($href, $called, $trunk, $seconds, $time) = @_;
 	return 0 if $seconds <= 0;
-	for my $i (keys %$json_ref) {
+	for my $i (keys %$href) {
 		if ($trunk =~ qr/^$i/) {
-			for my $j (keys $$json_ref{$i}) {
+			for my $j (keys $$href{$i}) {
 				if ($called =~ qr/^$j/) {
 					if (is_day($time)) {
-						return nearest( .01, $$json_ref{$i}{$j}[0] + $$json_ref{$i}{$j}[1] * ($seconds / 60) );
+						return nearest( .01, $$href{$i}{$j}[0] + $$href{$i}{$j}[1] * ($seconds / 60) );
 					}
-					return nearest( .01, $$json_ref{$i}{$j}[0] + $$json_ref{$i}{$j}[2] * ($seconds / 60) );
+					return nearest( .01, $$href{$i}{$j}[0] + $$href{$i}{$j}[2] * ($seconds / 60) );
 				}
 			}
 			# if we are here - take default values (they must be defined in the pricing file)
 			if (is_day($time)) {
-				return nearest( .01, $$json_ref{$i}{default}[0] + $$json_ref{$i}{default}[1] * ($seconds / 60) );
+				return nearest( .01, $$href{$i}{default}[0] + $$href{$i}{default}[1] * ($seconds / 60) );
 			}
-			return nearest( .01, $$json_ref{$i}{default}[0] + $$json_ref{$i}{default}[2] * ($seconds / 60) );
+			return nearest( .01, $$href{$i}{default}[0] + $$href{$i}{default}[2] * ($seconds / 60) );
 		}
 	}
 	# if we are here => trunk key is not found in pricing file (should not happen)
