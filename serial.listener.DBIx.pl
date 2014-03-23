@@ -6,11 +6,16 @@ use warnings;
 use AnyEvent;
 use AnyEvent::SerialPort;
 use Getopt::Long;
+use IO::Handle;
 use JSON;
 use Meridian::Schema;
 use Math::Round 'nearest';
 use Path::Class 'file';
 use 5.010;
+
+# disable stream buffering for both STDOUT and STDERR
+STDERR->autoflush(1);
+STDOUT->autoflush(1);
 
 sub is_day {
 	my @time = split /:/, shift;
@@ -34,11 +39,14 @@ sub calc_price; # at bottom of file
 
 
 my ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init);
-# tty -> device file name (for the serial port)
-# baudrate and databits are for the serial port connection
-# chomp -> number of digits of the access code
-# seconds -> seconds to subtract from duration of a call
-# pricing -> JSON file containing the call-pricing information
+my $INFO = q{
+	tty -> device file name (for the serial port)
+	baudrate and databits are for the serial port connection
+	chomp -> number of digits of the access code
+	seconds -> seconds to subtract from duration of a call
+	pricing -> JSON file containing the call-pricing information
+	initSQL -> sql code for creating the required tables
+};
 GetOptions ('tty=s'      => \$tty,
 			'baudrate=i' => \$baudrate,
 			'databits=i' => \$databits,
@@ -49,12 +57,12 @@ GetOptions ('tty=s'      => \$tty,
 	or die "Error in command line arguments\n";
 
 for ($tty, $baudrate, $databits, $chomp, $subtract, $pricing_file, $sql_init) {
-	die "Define all args: -tty, -baudrate, -databits, -chomp, -seconds, -pricing, -initSQL!\n"
+	die "Define all args: -tty, -baudrate, -databits, -chomp, -seconds, -pricing, -initSQL!\nArgs info: $INFO"
 	unless defined;
 }
 
-die "$pricing_file does not exist!\n" unless (-e $pricing_file);
-die "$sql_init does not exist!\n" unless (-e $sql_init);
+die "$pricing_file does not exist!\n" unless (-f $pricing_file);
+die "$sql_init does not exist!\n" unless (-f $sql_init);
 die "db directory does not exist!\n" unless (-d 'db');
 
 
