@@ -118,10 +118,10 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 			if ($line =~ qr/
 					^[NE]\s\d{3}\s\d{2}\s
 					(?<dn>\d{2,6})\s+
-					(?<trunk>\w+).{13}
+					(?<trunk>\w+).+?
 					(?<date>\d\d\/\d\d)\s+
 					(?<time>\d\d:\d\d)\s+
-					(?<duration>\d\d:\d\d:\d\d)\s+A*\s*
+					(?<duration>\d\d:\d\d:\d\d)\s+A?\s*
 					(?<number>\d+)
 				/x) {
 
@@ -138,8 +138,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$database.db");
 				my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
 
-				say qq/$+{dn} calling $+{number} through $+{trunk} on $+{date}
-					at $+{time}, lasting $+{duration} sec, price: $price./;
+				say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec, price: $price.";
 				my $time = ((localtime)[5] + 1900) . '-' . join '-', split '/', $+{date} . ' ' . $+{time};
 
 				my $user = $schema->resultset('User')->find_or_new({
