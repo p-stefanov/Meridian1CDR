@@ -138,8 +138,8 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 				my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$database.db");
 				my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
 
-				say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec, price: $price.";
-				my $time = ((localtime)[5] + 1900) . '-' . join '-', split '/', $+{date} . ' ' . $+{time};
+				#say "$+{dn} calling $+{number} through $+{trunk} on $+{date} at $+{time}, lasting $+{duration} sec, price: $price.";
+				#my $time = ((localtime)[5] + 1900) . '-' . join '-', split '/', $+{date} . ' ' . $+{time};
 
 				my $user = $schema->resultset('User')->find_or_new({
 					dn => $+{dn},
@@ -153,7 +153,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 					dn => $+{dn},
 					trunk => $+{trunk},
 					seconds => $seconds,
-					date => $time,
+					date => scalar localtime,
 					called => $+{number},
 					price => $price,
 				});
