@@ -18,8 +18,9 @@ STDERR->autoflush(1);
 STDOUT->autoflush(1);
 
 sub is_day {
-	my @time = split /:/, shift;
-	return $time[0] ge '08' && $time[0] lt '20';
+	# my @time = split /:/, shift;
+	my $time = (localtime)[2];
+	return $time ge '08' && $time lt '20';
 }
 
 sub this_month {
@@ -172,14 +173,14 @@ sub calc_price {
 		if ($trunk =~ qr/^$i/) {
 			for my $j (keys $$href{$i}) {
 				if ($called =~ qr/^$j/) {
-					if (is_day($time)) {
+					if (is_day()) {
 						return nearest( .01, $$href{$i}{$j}[0] + $$href{$i}{$j}[1] * ($seconds / 60) );
 					}
 					return nearest( .01, $$href{$i}{$j}[0] + $$href{$i}{$j}[2] * ($seconds / 60) );
 				}
 			}
 			# if we are here - take default values (they must be defined in the pricing file)
-			if (is_day($time)) {
+			if (is_day()) {
 				return nearest( .01, $$href{$i}{default}[0] + $$href{$i}{default}[1] * ($seconds / 60) );
 			}
 			return nearest( .01, $$href{$i}{default}[0] + $$href{$i}{default}[2] * ($seconds / 60) );
