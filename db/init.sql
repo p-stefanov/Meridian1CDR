@@ -15,5 +15,6 @@ trunk text not null,
 date text not null,
 called text not null,
 price real not null,
+type text,
 FOREIGN KEY(dn) REFERENCES user(dn)
 );

@@ -1,0 +1,16 @@
+{
+	"info" : {
+		"keys_format": "perl regex",
+		"values_format": ["initial price", "day-time price", "night-time price"],
+		"comment1": "default key for each trunk must be defined!",
+	},
+	"T002" : {
+		"_comment1": "BTK",
+		"0700": [0.132, 0.18, 0],
+		"087": [0.132, 0.15, 0.15],
+		"08[89]": [0.132, 0.29, 0.29],
+		"0900": [0.0, 0.96, 0.96],
+		"00": [0, 0.18, 0.18],
+		"default": [0.132, 0.05, 0],
+	},
+}

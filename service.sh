@@ -1,14 +1,26 @@
 #!/bin/bash
+# put this in /etc/init.d/
+# if ran as non-root user, ensure user is in dial-out group
+
+# INFO 
+# -tty -> serial port device file (e.g. /dev/ttyS0)
+# -baudrate and -databits are for the serial port connection
+# -ac_lenght -> number of digits of the access code
+# -dial_time -> seconds to subtract from the duration of a call
+#    (time presumably spent dialing)
+# -pricing -> JSON file containing the call-pricing information
+# -initSQL -> sql code for creating the required tables
+
 start() {
-        cd <path>
-        ./serial.listener.DBIx.pl -tty /dev/ttyS0 -baudrate 1200 \
-        -databits 7 -chomp 3 -seconds 10 -pricing pricing.json \
-        -initSQL db/init.sql >/dev/null 2>> err.log &
+    cd ?path? && \
+    ./CDR.pl -tty /dev/tty?? -baudrate ???? \
+    -databits ? -ac_lenght ? -dial_time ? -pricing pricing.json \
+    -initSQL db/init.sql >/dev/null 2>> err.log &
 	echo
 }
 
 stop() {
-	kill -9 `pidof perl serial.listener.DBIx.pl`
+	pkill -f 'CDR.pl' >/dev/null 2>&1
 	echo
 }
 
@@ -19,7 +31,7 @@ case "$1" in
   stop)
 	stop
 	;;
-  restart|reload|condrestart)
+  restart|reload)
 	stop
 	start
 	;;
