@@ -6,14 +6,14 @@ The script is supposed start on boot as a service. For convenience, it creates a
 
 # Usage
 1. Ensure that you have the following perl modules used by the script:
---* AnyEvent
---* AnyEvent::SerialPort
---* DBIx::Class
---* Getopt::Long
---* IO::Handle
---* JSON
---* Math::Round
---* Path::Class
+	* AnyEvent
+	* AnyEvent::SerialPort
+	* DBIx::Class
+	* Getopt::Long
+	* IO::Handle
+	* JSON
+	* Math::Round
+	* Path::Class
 
 2. Clone the repo.
 
@@ -28,5 +28,5 @@ The script is supposed start on boot as a service. For convenience, it creates a
 	[More info about this step here](http://manpages.ubuntu.com/manpages/hardy/man8/update-rc.d.8.html)
 
 # Important notes
---* The call records as printed by the PBX are not standardised! Edit the regexes in the script if they don't match yours.
---* The program works on the premise that all PBX access codes are the same lenght! (Which is usualy the case)
+* The call records as printed by the PBX are not standardised! Edit the regexes in the script if they don't match yours.
+* The program works on the premise that all PBX access codes are the same lenght! (Which is usualy the case)
