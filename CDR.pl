@@ -52,8 +52,8 @@ sub next_month {
 }
 
 sub to_seconds {
+	local $_ = shift;
 	# expected string in following format \d\d:\d\d:\d\d
-	return unless /^\d\d:\d\d:\d\d$/;
 	my @duration = split ':';
 	return $duration[0] * 3600 + $duration[1] * 60 + $duration[2];
 }
@@ -211,7 +211,7 @@ $cv->recv;
 sub calc_price {
 	my $called = substr($matched{number}, $access_code_lenght);
 
-	return 0 if $seconds <= 0;
+	return 0 if ($seconds <= 0 or not $called);
 
 	for my $i (keys %$json_ref) {
 		if ($matched{trunk} =~ qr/^$i/) {
