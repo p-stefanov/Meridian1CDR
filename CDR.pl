@@ -52,9 +52,8 @@ sub next_month {
 }
 
 sub to_seconds {
-	local $_ = shift;
 	# expected string in following format \d\d:\d\d:\d\d
-	my @duration = split ':';
+	my @duration = split ':', shift;
 	return $duration[0] * 3600 + $duration[1] * 60 + $duration[2];
 }
 
@@ -115,8 +114,6 @@ unless (-e "db/$dbName.db") {
 	say "file created for THIS month";
 }
 
-my $cv = AnyEvent->condvar;
-
 # timer to check every 27 days if db for next month exist and if not - create it
 my $w = AnyEvent->timer(
 	after => 0,
@@ -133,6 +130,7 @@ my $w = AnyEvent->timer(
 
 ###########################################################################
 # EVENT HANDLER
+my $cv = AnyEvent->condvar;
 my $hdl; $hdl = AnyEvent::SerialPort->new(
 	serial_port =>
 		[ $tty,
@@ -146,63 +144,62 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 		$hdl->destroy;
 		$cv->send;
 	},
-	on_read => sub {
-		my ($hdl) = @_;
-		$hdl->push_read (line => sub {
-			###########################################################################
-			# MAIN LOGIC OF SCRIPT
-
-			my ($hdl, $line) = @_;
-			say $line if $line =~ /^[NSE] /;
-
-			if ($line =~ qr{
-				^[NS]\s\d{3}\s\d\d\s
-				(?<dn>\d{1,6})\s+
-				(?<trunk>T\d{3}.\d{3})\s
-				(?<date>\d\d/\d\d)\s
-				(?<time>\d\d:\d\d)\s
-				(?<duration>\d\d:\d\d:\d\d)\s+A?\s*
-				(?<number>\d+)
-			}x) {
-				save_matched();
-				$seconds = to_seconds( $matched{duration} );
-
-				if ($line =~ /^N/) { # N stands for normal call type, i.e. not transfered
-					$seconds -= $dial_time;
-					$price = calc_price();
-					return if $price == 0;
-					update_db('N');	
-				} else { # the call has been transfered
-					$transfered_calls{ $matched{trunk} } = {
-						number => $matched{number},
-						seconds => $seconds
-					}; 
-				}	
-			} elsif ($line =~ qr{
-				^E\s\d{3}\s\d\d\s
-				(?<trunk>T\d{3}.\d{3})\s
-				(?<dn>\d{1,6})\s+
-				(?<date>\d\d/\d\d)\s
-				(?<time>\d\d:\d\d)\s
-				(?<duration>\d\d:\d\d:\d\d)
-			}x) { # ?<number> is missing in the regex => $matched{number} needs to be set
-				save_matched();
-				$seconds = to_seconds( $matched{duration} );
-
-				if ($transfered_calls{ $matched{trunk} }) {
-					$seconds += $transfered_calls{ $matched{trunk} }{seconds} - $dial_time;
-					# $matched{number} is set
-					$matched{number} = $transfered_calls{ $matched{trunk} }{number};
-					$price = calc_price();
-					return if $price == 0;
-					update_db('');
-					delete $transfered_calls{ $matched{trunk} };
-				}
-			}
-		});
-	},
 	# other AnyEvent::Handle arguments here
 );
+
+###########################################################################
+# MAIN LOGIC OF SCRIPT
+$hdl->on_read(sub {
+	$hdl->push_read (line => sub {
+		my ($hdl, $line) = @_;
+		# say $line if $line =~ /^[NSE] /;
+
+		if ($line =~ qr{
+			^[NS]\s\d{3}\s\d\d\s
+			(?<dn>\d{1,6})\s+
+			(?<trunk>T\d{3}.\d{3})\s
+			(?<date>\d\d/\d\d)\s
+			(?<time>\d\d:\d\d)\s
+			(?<duration>\d\d:\d\d:\d\d)\s+A?\s*
+			(?<number>\d+)
+		}x) {
+			save_matched();
+			$seconds = to_seconds( $matched{duration} );
+
+			if ($line =~ /^N/) { # N stands for normal call type, i.e. not transfered
+				$seconds -= $dial_time;
+				$price = calc_price();
+				return if $price == 0;
+				update_db('N');	
+			} else { # the call has been transfered
+				$transfered_calls{ $matched{trunk} } = {
+					number => $matched{number},
+					seconds => $seconds
+				}; 
+			}	
+		} elsif ($line =~ qr{
+			^E\s\d{3}\s\d\d\s
+			(?<trunk>T\d{3}.\d{3})\s
+			(?<dn>\d{1,6})\s+
+			(?<date>\d\d/\d\d)\s
+			(?<time>\d\d:\d\d)\s
+			(?<duration>\d\d:\d\d:\d\d)
+		}x) { # ?<number> is missing in the regex => $matched{number} needs to be set
+			save_matched();
+			$seconds = to_seconds( $matched{duration} );
+
+			if ($transfered_calls{ $matched{trunk} }) {
+				$seconds += $transfered_calls{ $matched{trunk} }{seconds} - $dial_time;
+				# $matched{number} is set
+				$matched{number} = $transfered_calls{ $matched{trunk} }{number};
+				$price = calc_price();
+				return if $price == 0;
+				update_db('');
+				undef $transfered_calls{ $matched{trunk} };
+			}
+		}
+	});
+});
 
 $cv->recv;
 
