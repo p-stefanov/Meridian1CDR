@@ -152,11 +152,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 		$cv->send;
 	},
 	on_read => sub {
-<<<<<<< HEAD
 		my ($hdl) = @_;
-=======
-	my ($hdl) = @_;
->>>>>>> dd5972ad9e8acf3987e31ed9fafd5f0e383f85a8
 		$hdl->push_read (line => &process);
 	}
 	# other AnyEvent::Handle arguments here
