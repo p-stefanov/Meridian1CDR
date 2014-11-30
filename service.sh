@@ -5,7 +5,6 @@
 # INFO 
 # -tty -> serial port device file (e.g. /dev/ttyS0)
 # -baudrate and -databits are for the serial port connection
-# -ac_lenght -> number of digits of the access code
 # -dial_time -> seconds to subtract from the duration of a call
 #    (time presumably spent dialing)
 # -pricing -> JSON file containing the call-pricing information
@@ -14,30 +13,29 @@
 start() {
     cd ?path? && \
     ./CDR.pl -tty /dev/tty?? -baudrate ???? \
-    -databits ? -ac_lenght ? -dial_time ? -pricing pricing.json \
+    -databits ? -dial_time ? -pricing pricing.json \
     -initSQL db/init.sql >/dev/null 2>> err.log &
-	echo
+    echo
 }
 
 stop() {
-	pkill -f 'CDR.pl' >/dev/null 2>&1
-	echo
+    pkill -f 'CDR.pl' >/dev/null 2>&1
+    echo
 }
 
 case "$1" in
   start)
-	start
-	;;
+    start
+    ;;
   stop)
-	stop
-	;;
+    stop
+    ;;
   restart|reload)
-	stop
-	start
-	;;
+    stop
+    start
+    ;;
   *)
-	echo "Usage: $0 {start|stop|restart|reload}"
-	exit 1
+    echo "Usage: $0 {start|stop|restart|reload}"
+    exit 1
 esac
 exit 0
-

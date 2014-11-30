@@ -1,8 +1,9 @@
 {
+	"access_codes" : ["80", "123"],
 	"info" : {
 		"keys_format": "perl regex",
 		"values_format": ["initial price", "day-time price", "night-time price"],
-		"comment1": "default key for each trunk must be defined!",
+		"comment1": "'default' key for each trunk must be defined!",
 	},
 	"T002" : {
 		"_comment1": "BTK",
