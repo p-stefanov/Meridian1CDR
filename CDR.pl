@@ -8,6 +8,7 @@ use JSON;
 use Math::Round 'nearest';
 use Meridian::Schema;
 use Modern::Perl '2010';
+use Path::Class 'file';
 
 ###########################################################################
 # GLOBALS AND INFO
@@ -186,7 +187,7 @@ sub process {
 			$SECONDS -= $DIAL_TIME;
 			$PRICE = calc_price();
 			if ($PRICE == 0) {
-				print STDERR "$line\n";
+				say "price = 0: $line\n";
 				return;
 			}
 
@@ -215,7 +216,7 @@ sub process {
 			$MATCHED{number} = $TRANSFERED_CALLS{ $MATCHED{trunk} }{number};
 			$PRICE = calc_price();
 			if ($PRICE == 0) {
-				print STDERR "$line\n";
+				say "price = 0: $line\n";
 				return;
 			}
 
@@ -237,32 +238,25 @@ sub calc_price {
 		if ($MATCHED{trunk} =~ qr/^$i/) {
 			for my $j (keys $$JSON_REF{$i}) {
 				if ($called =~ qr/^$j/) {
-					if (is_day()) {
-						return nearest( .01, $$JSON_REF{$i}{$j}[0]
-							+ $$JSON_REF{$i}{$j}[1] * ($SECONDS / 60) );
-					}
 					return nearest( .01, $$JSON_REF{$i}{$j}[0]
-						+ $$JSON_REF{$i}{$j}[2] * ($SECONDS / 60) );
+						+ $$JSON_REF{$i}{$j}[is_day() ? 1 : 2] * ($SECONDS / 60) );
 				}
 			}
 			# if we are here - take default values
 			# (they must be defined in the pricing file)
-			if (is_day()) {
-				return nearest( .01, $$JSON_REF{$i}{default}[0]
-					+ $$JSON_REF{$i}{default}[1] * ($SECONDS / 60) );
-			}
 			return nearest( .01, $$JSON_REF{$i}{default}[0]
-				+ $$JSON_REF{$i}{default}[2] * ($SECONDS / 60) );
+				+ $$JSON_REF{$i}{default}[is_day() ? 1 : 2] * ($SECONDS / 60) );
 		}
 	}
 	# if we are here => trunk key is not found in pricing file (should not happen)
-	print STDERR "$MATCHED{trunk} key not found in $PRICING_FILE\n";
+	warn "$MATCHED{trunk} key not found in $PRICING_FILE\n";
 	return 0;
 }
 
 sub update_db {
 	my $database = this_month();
-	my $schema = Meridian::Schema->connect("dbi:SQLite:db/$database.db");
+	my $db_fn = file($INC{'Meridian/Schema.pm'})->dir->parent->file("db/$database.db");
+        my $schema = Meridian::Schema->connect("dbi:SQLite:$db_fn");
 
 	my $user = $schema->resultset('User')->find_or_new({
 		dn => $MATCHED{dn},

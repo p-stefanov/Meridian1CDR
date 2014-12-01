@@ -14,7 +14,7 @@ start() {
     cd ?path? && \
     ./CDR.pl -tty /dev/tty?? -baudrate ???? \
     -databits ? -dial_time ? -pricing pricing.json \
-    -initSQL db/init.sql >/dev/null 2>> err.log &
+    -initSQL db/init.sql >> debug.log 2>> err.log &
     echo
 }
 
