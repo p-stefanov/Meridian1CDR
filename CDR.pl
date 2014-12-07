@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+	require Log::Log4perl;
+	Log::Log4perl->init( 'log.conf' );
+}
+
 use AnyEvent;
 use AnyEvent::SerialPort;
 use Getopt::Long;
@@ -13,6 +18,7 @@ use Path::Class 'file';
 ###########################################################################
 # GLOBALS AND INFO
 
+our $logger = Log::Log4perl->get_logger(__PACKAGE__);
 use vars qw/
 	$TTY
 	$BAUDRATE
@@ -85,27 +91,27 @@ sub process;
 STDERR->autoflush(1);
 STDOUT->autoflush(1);
 
-GetOptions ('tty=s'	   => \$TTY,
+GetOptions ('tty=s'       => \$TTY,
             'baudrate=i'  => \$BAUDRATE,
             'databits=i'  => \$DATABITS,
             'dial_time=i' => \$DIAL_TIME,
             'pricing=s'   => \$PRICING_FILE,
             'initSQL=s'   => \$SQL_INIT)
-	or die "Error in command line arguments\n";
+	or $logger->logdie( "Error in command line arguments" );
 
 for ($TTY, $BAUDRATE, $DATABITS, $DIAL_TIME, $PRICING_FILE, $SQL_INIT) {
-	die "Not all args specified!\n$USAGE" unless defined;
+	$logger->logdie( "Not all args specified!\n$USAGE" ) unless defined;
 }
 
-die "$PRICING_FILE does not exist!\n" unless (-f $PRICING_FILE);
-die "$SQL_INIT does not exist!\n" unless (-f $SQL_INIT);
+$logger->logdie( "$PRICING_FILE does not exist!" ) unless (-f $PRICING_FILE);
+$logger->logdie( "$SQL_INIT does not exist!" ) unless (-f $SQL_INIT);
 
 ###########################################################################
 # LOAD PRICING INFO
 
 # get info from pricing file
 local $/;
-open( my $fh, '<', $PRICING_FILE ) or die $!;
+open( my $fh, '<', $PRICING_FILE ) or $logger->logdie( $! );
 
 my $json = JSON->new->allow_nonref;
 $json = $json->relaxed([1]); # for trailing commas
@@ -118,8 +124,8 @@ close $fh;
 # on startup check if db for this month exists and if not - create it
 my $dbName = this_month();
 unless (-e "db/$dbName.db") {
-	system("sqlite3 db/$dbName.db < $SQL_INIT") == 0 or die $!;
-	say "file created for THIS month";
+	system("sqlite3 db/$dbName.db < $SQL_INIT") == 0 or $logger->logdie( $! );
+	$logger->info( "file created for THIS month" );
 }
 
 # timer to check every 27 days if db for next month exist and if not - create it
@@ -129,8 +135,8 @@ my $w = AnyEvent->timer(
 	cb => sub {
 		my $database = next_month();
 		unless (-e "db/$database.db") {
-			system("sqlite3 db/$database.db < $SQL_INIT") == 0 or die $!;
-			say "file created for NEXT month";
+			system("sqlite3 db/$database.db < $SQL_INIT") == 0 or $logger->logdie( $! );
+			$logger->info( "file created for NEXT month" );
 		}
 	}
 );
@@ -148,7 +154,8 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 		],
 	on_error => sub {
 		my ($hdl, $fatal, $msg) = @_;
-		AE::log error => $msg;
+		$logger->fatal( $fatal ) if $fatal;
+		$logger->error( $msg );
 		$hdl->destroy;
 		$cv->send;
 	},
@@ -169,7 +176,8 @@ $cv->recv;
 sub process {
 ##### MAIN LOGIC OF THE SCRIPT
 	my ($hdl, $line) = @_;
-	# say $line if $line =~ /^[NSE] /;
+	$logger->trace( "PBX says: " . $line );
+	$logger->debug( "CDR line: " . $line ) if $line =~ /^[NSE] /;
 
 	if ($line =~ qr{
 		^[NS]\s\d{3}\s\d\d\s
@@ -187,7 +195,7 @@ sub process {
 			$SECONDS -= $DIAL_TIME;
 			$PRICE = calc_price();
 			if ($PRICE == 0) {
-				say "price = 0: $line\n";
+				$logger->info( "price = 0: $line" );
 				return;
 			}
 
@@ -216,7 +224,7 @@ sub process {
 			$MATCHED{number} = $TRANSFERED_CALLS{ $MATCHED{trunk} }{number};
 			$PRICE = calc_price();
 			if ($PRICE == 0) {
-				say "price = 0: $line\n";
+				$logger->info( "price = 0: $line" );
 				return;
 			}
 
@@ -229,6 +237,7 @@ sub process {
 
 
 sub calc_price {
+	$logger->debug( "calculating price for number: " . $MATCHED{number} );
 	my $called = $MATCHED{number};
 	for my $access_code (@{ $$JSON_REF{'access_codes'} }) {
 		last if $called =~ s/^$access_code//;
@@ -236,20 +245,23 @@ sub calc_price {
 
 	for my $i (keys %$JSON_REF) {
 		if ($MATCHED{trunk} =~ qr/^$i/) {
+			$logger->debug( 'Trunk ' . $MATCHED{trunk} . ' matched ' . "^$i" );
 			for my $j (keys $$JSON_REF{$i}) {
 				if ($called =~ qr/^$j/) {
+					$logger->debug( 'Number ' . $called . ' matched ' . "^$j" );
 					return nearest( .01, $$JSON_REF{$i}{$j}[0]
 						+ $$JSON_REF{$i}{$j}[is_day() ? 1 : 2] * ($SECONDS / 60) );
 				}
 			}
 			# if we are here - take default values
 			# (they must be defined in the pricing file)
+			$logger->debug( "taking default values for number $MATCHED{number}, trunk $MATCHED{trunk}" );
 			return nearest( .01, $$JSON_REF{$i}{default}[0]
 				+ $$JSON_REF{$i}{default}[is_day() ? 1 : 2] * ($SECONDS / 60) );
 		}
 	}
 	# if we are here => trunk key is not found in pricing file (should not happen)
-	warn "$MATCHED{trunk} key not found in $PRICING_FILE\n";
+	$logger->error( "$MATCHED{trunk} key not found in $PRICING_FILE" );
 	return 0;
 }
 

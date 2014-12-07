@@ -11,6 +11,7 @@ The script is supposed start on boot as a service. For convenience, it creates a
 	* JSON
 	* Math::Round
 	* Modern::Perl
+	* Log::Log4perl
 	* Path::Class
 
 2. SQLite version 3
