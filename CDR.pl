@@ -193,6 +193,10 @@ sub process {
 
 		if ($line =~ /^N/) { # N stands for normal call type, i.e. not transfered
 			$SECONDS -= $DIAL_TIME;
+			if ($SECONDS <= 0) {
+				$logger->info( "seconds - dial_time <= 0: $line" );
+				return;
+			}
 			$PRICE = calc_price();
 			if ($PRICE == 0) {
 				$logger->info( "price = 0: $line" );
@@ -220,6 +224,10 @@ sub process {
 
 		if ($TRANSFERED_CALLS{ $MATCHED{trunk} }) {
 			$SECONDS += $TRANSFERED_CALLS{ $MATCHED{trunk} }{seconds} - $DIAL_TIME;
+			if ($SECONDS <= 0) {
+				$logger->info( "seconds - dial_time <= 0: $line" );
+				return;
+			}
 			# $MATCHED{number} is set
 			$MATCHED{number} = $TRANSFERED_CALLS{ $MATCHED{trunk} }{number};
 			$PRICE = calc_price();
@@ -241,6 +249,13 @@ sub calc_price {
 	my $called = $MATCHED{number};
 	for my $access_code (@{ $$JSON_REF{'access_codes'} }) {
 		last if $called =~ s/^$access_code//;
+	}
+
+	return 0 if length $called < 3;
+
+	if ($called eq $MATCHED{number}) {
+		$logger->error("No access code matched for $called");
+		return 0;
 	}
 
 	for my $i (keys %$JSON_REF) {
