@@ -161,7 +161,7 @@ my $hdl; $hdl = AnyEvent::SerialPort->new(
 	},
 	on_read => sub {
 		my ($hdl) = @_;
-		$hdl->push_read (line => &process);
+		$hdl->push_read (line => \&process);
 	}
 	# other AnyEvent::Handle arguments here
 );
@@ -279,12 +279,12 @@ sub update_db {
 	$user->insert_or_update;
 
 	$schema->resultset('Call')->create({
-		dn => $MATCHED{dn},
-		trunk => $MATCHED{trunk},
+		dn      => $MATCHED{dn},
+		trunk   => $MATCHED{trunk},
 		seconds => $SECONDS,
-		date => scalar localtime,
-		called => $MATCHED{number},
-		price => $PRICE,
-		type => shift
+		date    => scalar localtime,
+		called  => $MATCHED{number},
+		price   => $PRICE,
+		type    => shift
 	});
 }
